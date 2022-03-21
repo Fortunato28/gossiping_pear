@@ -13,3 +13,4 @@ futures-channel = "0.3.21"
 futures-util = "0.3.21"
 tungstenite = "0.17.2"
 clap = { version = "3.1.6", features = ["derive"] }
+url = "2.2.2"
