@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.17.0", features = ["full"] }
-actix-web = "4.0.1"
-actix-web-actors = "4.1.0"
-actix = "0.13.0"
+tokio-tungstenite = "0.17.1"
+futures = "0.3.21"
+futures-channel = "0.3.21"
+futures-util = "0.3.21"
+tungstenite = "0.17.2"
