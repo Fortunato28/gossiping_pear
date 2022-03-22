@@ -3,21 +3,17 @@ pub mod gossiping;
 pub mod server;
 
 use std::{
-    collections::HashMap,
     io::Error as IoError,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
 
 use clap::Parser;
-use futures_channel::mpsc::UnboundedSender;
-use tungstenite::protocol::Message;
 
 use client::run_client;
 use server::run_server;
 
-type Tx = UnboundedSender<Message>;
-type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
+type PeerMap = Arc<Mutex<Vec<SocketAddr>>>;
 
 fn nothing_to_do() {}
 

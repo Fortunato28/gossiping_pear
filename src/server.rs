@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Mutex};
+use std::{net::SocketAddr, sync::Mutex};
 
 use crate::{gossiping::gossiping, PeerMap};
 use futures::{future, pin_mut, StreamExt, TryStreamExt};
@@ -19,19 +19,18 @@ async fn handle_connection(
         .expect("Error during the websocket handshake occurred");
     println!("WebSocket connection established: {}", addr);
 
-    // Insert the write part of this peer to the peer map.
-    let (tx, rx) = unbounded();
-    dbg!(&addr.ip().to_string());
-    peer_map.lock().unwrap().insert(addr, tx.clone());
-
     let (outgoing, mut incoming) = ws_stream.split();
-
-    tokio::spawn(gossiping(tx, period));
 
     let connected_peer_listenting_port = incoming.next().await.unwrap().unwrap().to_string();
     let connected_peer_address =
         SocketAddr::new(addr.ip(), connected_peer_listenting_port.parse().unwrap());
     dbg!(&connected_peer_address);
+    peer_map.lock().unwrap().push(connected_peer_address);
+
+    // Insert the write part of this peer to the peer map.
+    let (tx, rx) = unbounded();
+
+    tokio::spawn(gossiping(tx, period));
 
     let broadcast_incoming = incoming.try_for_each(|msg| {
         println!(
@@ -48,13 +47,17 @@ async fn handle_connection(
     future::select(broadcast_incoming, receive_from_others).await;
 
     println!("{} disconnected", &addr);
-    peer_map.lock().unwrap().remove(&addr);
+    // Delete disconnected peer
+    peer_map
+        .lock()
+        .unwrap()
+        .retain(|&addr| addr != connected_peer_address);
 }
 
 pub async fn run_server(port: u16, period: u32) {
     let addr = format!("127.0.0.1:{}", port);
 
-    let state = PeerMap::new(Mutex::new(HashMap::new()));
+    let state = PeerMap::new(Mutex::new(Vec::new()));
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;

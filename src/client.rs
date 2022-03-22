@@ -15,7 +15,7 @@ async fn send_server_port(tx: UnboundedSender<Message>, port: u16) {
 }
 
 async fn client_behavior(period: u32, connection: String, port: u16) {
-    // TODO handle panic when unable to connect
+    // TODO handle panic when unable to connect because there are no other peer
     let (ws_stream, _) = connect_async(format!("ws://{}", connection))
         .await
         .expect("Failed to connect");
