@@ -1,11 +1,17 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Mutex};
 
-use crate::PeerMap;
+use crate::{gossiping::gossiping, PeerMap};
 use futures::{future, pin_mut, StreamExt, TryStreamExt};
 use futures_channel::mpsc::unbounded;
 use tokio::net::{TcpListener, TcpStream};
 
-async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: SocketAddr) {
+// TODO share contacts with new peer
+async fn handle_connection(
+    peer_map: PeerMap,
+    raw_stream: TcpStream,
+    addr: SocketAddr,
+    period: u32,
+) {
     println!("Incoming TCP connection from: {}", addr);
 
     let ws_stream = tokio_tungstenite::accept_async(raw_stream)
@@ -18,6 +24,8 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
     peer_map.lock().unwrap().insert(addr, tx.clone());
 
     let (outgoing, incoming) = ws_stream.split();
+
+    tokio::spawn(gossiping(tx, period));
 
     let broadcast_incoming = incoming.try_for_each(|msg| {
         println!(
@@ -37,7 +45,7 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
     peer_map.lock().unwrap().remove(&addr);
 }
 
-pub async fn run_server(port: u16) {
+pub async fn run_server(port: u16, period: u32) {
     let addr = format!("127.0.0.1:{}", port);
 
     let state = PeerMap::new(Mutex::new(HashMap::new()));
@@ -49,6 +57,6 @@ pub async fn run_server(port: u16) {
 
     // Let's spawn the handling of each connection in a separate task.
     while let Ok((stream, addr)) = listener.accept().await {
-        tokio::spawn(handle_connection(state.clone(), stream, addr));
+        tokio::spawn(handle_connection(state.clone(), stream, addr, period));
     }
 }

@@ -1,4 +1,5 @@
 pub mod client;
+pub mod gossiping;
 pub mod server;
 
 use std::{
@@ -43,7 +44,7 @@ async fn main() -> Result<(), IoError> {
     } = Arguments::parse();
 
     run_client(period, connection);
-    run_server(port).await;
+    run_server(port, period).await;
 
     Ok(())
 }
