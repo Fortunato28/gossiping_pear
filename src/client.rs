@@ -5,7 +5,17 @@ use tungstenite::Message;
 
 use crate::{gossiping::gossiping, nothing_to_do};
 
-async fn client_behavior(period: u32, connection: String) {
+async fn send_server_port(tx: UnboundedSender<Message>, port: u16) {
+    match tx.unbounded_send(Message::Text(port.to_string())) {
+        Ok(_) => nothing_to_do(),
+        Err(_) => {
+            dbg!(&"Unable to send port!");
+        }
+    }
+}
+
+async fn client_behavior(period: u32, connection: String, port: u16) {
+    // TODO handle panic when unable to connect
     let (ws_stream, _) = connect_async(format!("ws://{}", connection))
         .await
         .expect("Failed to connect");
@@ -25,6 +35,7 @@ async fn client_behavior(period: u32, connection: String) {
         future::ok(())
     });
 
+    send_server_port(tx.clone(), port).await;
     tokio::spawn(gossiping(tx, period));
     let sending_process = rx.map(Ok).forward(outgoing);
 
@@ -32,8 +43,8 @@ async fn client_behavior(period: u32, connection: String) {
     future::select(broadcast_incoming, sending_process).await;
 }
 
-pub fn run_client(period: u32, connection: Vec<String>) {
+pub fn run_client(period: u32, connection: Vec<String>, port: u16) {
     connection.iter().for_each(|connection| {
-        tokio::spawn(client_behavior(period, connection.clone()));
+        tokio::spawn(client_behavior(period, connection.clone(), port));
     })
 }

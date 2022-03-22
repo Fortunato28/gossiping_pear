@@ -43,7 +43,7 @@ async fn main() -> Result<(), IoError> {
         connection,
     } = Arguments::parse();
 
-    run_client(period, connection);
+    run_client(period, connection, port);
     run_server(port, period).await;
 
     Ok(())

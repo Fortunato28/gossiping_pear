@@ -21,11 +21,17 @@ async fn handle_connection(
 
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
+    dbg!(&addr.ip().to_string());
     peer_map.lock().unwrap().insert(addr, tx.clone());
 
-    let (outgoing, incoming) = ws_stream.split();
+    let (outgoing, mut incoming) = ws_stream.split();
 
     tokio::spawn(gossiping(tx, period));
+
+    let connected_peer_listenting_port = incoming.next().await.unwrap().unwrap().to_string();
+    let connected_peer_address =
+        SocketAddr::new(addr.ip(), connected_peer_listenting_port.parse().unwrap());
+    dbg!(&connected_peer_address);
 
     let broadcast_incoming = incoming.try_for_each(|msg| {
         println!(

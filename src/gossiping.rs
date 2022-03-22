@@ -1,4 +1,4 @@
-use futures_channel::mpsc::{unbounded, UnboundedSender};
+use futures_channel::mpsc::UnboundedSender;
 use std::time::Duration;
 use tungstenite::Message;
 
