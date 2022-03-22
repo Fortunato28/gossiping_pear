@@ -1,4 +1,7 @@
-use futures::{future, pin_mut, StreamExt, TryStreamExt};
+use futures::{
+    future::{self, BoxFuture},
+    pin_mut, FutureExt, StreamExt, TryStreamExt,
+};
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use itertools::Itertools;
 use tokio_tungstenite::connect_async;
@@ -40,7 +43,7 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
     //    future::ok(())
     //});
 
-    let broadcast_incoming = receive_data(incoming, connection, port);
+    let broadcast_incoming = receive_data(incoming, connection, port, period);
 
     tokio::spawn(gossiping(tx.clone(), period));
     send_server_port(tx, port).await;
@@ -51,7 +54,7 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
     future::select(broadcast_incoming, sending_process).await;
 }
 
-async fn receive_data(
+fn receive_data(
     mut incoming: futures::stream::SplitStream<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
@@ -59,35 +62,39 @@ async fn receive_data(
     >,
     connection: String,
     port: u16,
-) -> Result<(), Error> {
-    let peers_to_connect = incoming.next().await.unwrap().unwrap().to_string();
-    dbg!(&peers_to_connect);
-    let peers_to_connect = peers_to_connect
-        .split_whitespace()
-        .into_iter()
-        .map(|address| address.to_string())
-        .collect_vec();
-    //.for_each(|address| {
-    //    dbg!(address);
-    //    tokio::spawn(client_behavior(2, address.to_string(), port));
-    //});
+    period: u32,
+) -> BoxFuture<'static, Result<(), Error>> {
+    async move {
+        let peers_to_connect = incoming.next().await.unwrap().unwrap().to_string();
+        dbg!(&peers_to_connect);
+        let peers_to_connect = peers_to_connect
+            .split_whitespace()
+            .into_iter()
+            .map(|address| address.to_string())
+            .collect_vec();
+        //.for_each(|address| {
+        //    dbg!(address);
+        //    tokio::spawn(client_behavior(2, address.to_string(), port));
+        //});
 
-    //for address in peers_to_connect {
-    //    tokio::spawn(client_behavior(2, address.to_string(), port));
-    //}
+        for address in peers_to_connect {
+            tokio::spawn(client_behavior(period, address.to_string(), port));
+        }
 
-    // TODO probably extract shared incoming behavior with server part
-    let broadcast_incoming = incoming.try_for_each(move |msg| {
-        println!(
-            "Received a message from {}: {}",
-            connection,
-            msg.to_text().unwrap()
-        );
+        // TODO probably extract shared incoming behavior with server part
+        let broadcast_incoming = incoming.try_for_each(move |msg| {
+            println!(
+                "Received a message from {}: {}",
+                connection,
+                msg.to_text().unwrap()
+            );
 
-        future::ok(())
-    });
+            future::ok(())
+        });
 
-    broadcast_incoming.await
+        broadcast_incoming.await
+    }
+    .boxed()
 }
 
 pub fn run_client(period: u32, connection: Vec<String>, port: u16) {
