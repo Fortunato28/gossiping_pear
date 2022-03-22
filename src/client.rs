@@ -21,8 +21,11 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
         .expect("Failed to connect");
     println!("WebSocket handshake has been successfully completed");
 
-    let (outgoing, incoming) = ws_stream.split();
+    let (outgoing, mut incoming) = ws_stream.split();
     let (tx, rx) = unbounded();
+
+    //let peers_to_connect = incoming.next().await.unwrap().unwrap().to_string();
+    //dbg!(&peers_to_connect);
 
     // TODO probably extract shared incoming behavior with server part
     let broadcast_incoming = incoming.try_for_each(|msg| {
@@ -35,12 +38,26 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
         future::ok(())
     });
 
-    send_server_port(tx.clone(), port).await;
-    tokio::spawn(gossiping(tx, period));
+    //let broadcast_incoming = receive_data(incoming, connection);
+
+    tokio::spawn(gossiping(tx.clone(), period));
+    send_server_port(tx, port).await;
+
     let sending_process = rx.map(Ok).forward(outgoing);
 
     pin_mut!(broadcast_incoming, sending_process);
     future::select(broadcast_incoming, sending_process).await;
+}
+
+fn receive_data(
+    incoming: futures::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        >,
+    >,
+    connection: String,
+) -> () {
+    todo!()
 }
 
 pub fn run_client(period: u32, connection: Vec<String>, port: u16) {

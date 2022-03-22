@@ -2,8 +2,17 @@ use std::{net::SocketAddr, sync::Mutex};
 
 use crate::{gossiping::gossiping, PeerMap};
 use futures::{future, pin_mut, StreamExt, TryStreamExt};
-use futures_channel::mpsc::unbounded;
+use futures_channel::mpsc::{unbounded, UnboundedSender};
+use itertools::Itertools;
 use tokio::net::{TcpListener, TcpStream};
+use tungstenite::Message;
+
+fn send_other_peers(tx: UnboundedSender<Message>, current_peer_map: String) {
+    match tx.unbounded_send(Message::Text(current_peer_map)) {
+        Ok(_) => dbg!(&"Peer map successfully shared"),
+        Err(_) => dbg!(&"Error while trying to share peer map"),
+    };
+}
 
 // TODO share contacts with new peer
 async fn handle_connection(
@@ -20,15 +29,22 @@ async fn handle_connection(
     println!("WebSocket connection established: {}", addr);
 
     let (outgoing, mut incoming) = ws_stream.split();
+    let (tx, rx) = unbounded();
 
     let connected_peer_listenting_port = incoming.next().await.unwrap().unwrap().to_string();
     let connected_peer_address =
         SocketAddr::new(addr.ip(), connected_peer_listenting_port.parse().unwrap());
     dbg!(&connected_peer_address);
-    peer_map.lock().unwrap().push(connected_peer_address);
 
+    let current_peer_map = peer_map
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|address| address.to_string())
+        .join(" ");
+    send_other_peers(tx.clone(), current_peer_map);
     // Insert the write part of this peer to the peer map.
-    let (tx, rx) = unbounded();
+    peer_map.lock().unwrap().push(connected_peer_address);
 
     tokio::spawn(gossiping(tx, period));
 
@@ -42,9 +58,9 @@ async fn handle_connection(
         future::ok(())
     });
 
-    let receive_from_others = rx.map(Ok).forward(outgoing);
-    pin_mut!(broadcast_incoming, receive_from_others);
-    future::select(broadcast_incoming, receive_from_others).await;
+    let gossiping_channel = rx.map(Ok).forward(outgoing);
+    pin_mut!(broadcast_incoming, gossiping_channel);
+    future::select(broadcast_incoming, gossiping_channel).await;
 
     println!("{} disconnected", &addr);
     // Delete disconnected peer
