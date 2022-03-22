@@ -3,7 +3,6 @@ use futures::{
     pin_mut, FutureExt, StreamExt, TryStreamExt,
 };
 use futures_channel::mpsc::{unbounded, UnboundedSender};
-use itertools::Itertools;
 use tokio_tungstenite::connect_async;
 use tungstenite::{Error, Message};
 
@@ -25,23 +24,8 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
         .expect("Failed to connect");
     println!("WebSocket handshake has been successfully completed");
 
-    let (outgoing, mut incoming) = ws_stream.split();
+    let (outgoing, incoming) = ws_stream.split();
     let (tx, rx) = unbounded();
-
-    //let peers_to_connect = incoming.next().await.unwrap().unwrap().to_string();
-    //dbg!(&peers_to_connect);
-
-    //// TODO probably extract shared incoming behavior with server part
-    //let broadcast_incoming = incoming.try_for_each(move |msg| {
-    //    let connection = connection.clone();
-    //    println!(
-    //        "Received a message from {}: {}",
-    //        connection,
-    //        msg.to_text().unwrap()
-    //    );
-
-    //    future::ok(())
-    //});
 
     let broadcast_incoming = receive_data(incoming, connection, port, period);
 
@@ -67,19 +51,14 @@ fn receive_data(
     async move {
         let peers_to_connect = incoming.next().await.unwrap().unwrap().to_string();
         dbg!(&peers_to_connect);
-        let peers_to_connect = peers_to_connect
+        peers_to_connect
             .split_whitespace()
             .into_iter()
-            .map(|address| address.to_string())
-            .collect_vec();
-        //.for_each(|address| {
-        //    dbg!(address);
-        //    tokio::spawn(client_behavior(2, address.to_string(), port));
-        //});
-
-        for address in peers_to_connect {
-            tokio::spawn(client_behavior(period, address.to_string(), port));
-        }
+            // TODO fix that format
+            .filter(|address| *address != format!("127.0.0.1:{}", port))
+            .for_each(|address| {
+                tokio::spawn(client_behavior(period, address.to_string(), port));
+            });
 
         // TODO probably extract shared incoming behavior with server part
         let broadcast_incoming = incoming.try_for_each(move |msg| {
