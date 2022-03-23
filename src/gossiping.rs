@@ -2,6 +2,7 @@ use futures_channel::mpsc::UnboundedSender;
 use std::time::Duration;
 use tungstenite::Message;
 
+/// Allows endlessly to send message with sleep defining by `period` argument
 pub(crate) async fn gossiping(tx: UnboundedSender<Message>, period: u32) {
     loop {
         if tx

@@ -16,6 +16,7 @@ fn send_other_peers(tx: &UnboundedSender<Message>, current_peer_map: String) -> 
     Ok(())
 }
 
+/// According to this application inner protocol, this server receives port of other peer server
 async fn receive_connected_peer_address(
     incoming: &mut futures::stream::SplitStream<tokio_tungstenite::WebSocketStream<TcpStream>>,
     connected_peer_address: SocketAddr,
@@ -124,8 +125,9 @@ async fn handle_connection_with_error_propagating(
     Ok(())
 }
 
-///
+/// Server starting, basically allows to accept new connections
 /// # Errors
+/// Server will not start if binding was failed
 pub async fn run(server_address: SocketAddr, period: u32) -> Result<()> {
     let peers_to_connect = PeerMap::new(Mutex::new(Vec::new()));
 

@@ -53,6 +53,8 @@ async fn client_behavior(period: u32, connection: String, server_address: Socket
     };
 }
 
+/// Start of receiving messages from other peer.
+/// First message is all other peers this client needs to connect
 // We need exactly this return type to avoid recursion in async function
 fn receive_data(
     mut incoming: futures::stream::SplitStream<
@@ -65,6 +67,7 @@ fn receive_data(
     period: u32,
 ) -> BoxFuture<'static, Result<(), Error>> {
     async move {
+        // According to this application inner protocol, client receives list of other peers split by whitespaces
         let peers_to_connect = match incoming
             .next()
             .await
@@ -113,6 +116,7 @@ fn receive_data(
     .boxed()
 }
 
+/// Start of separate task for each connection
 #[allow(clippy::needless_for_each)]
 pub fn run(period: u32, connection: &[String], server_address: SocketAddr) {
     connection.iter().for_each(|connection| {
