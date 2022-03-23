@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
     } = Arguments::parse();
 
     let server_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
-    run_client(period, connection, port);
+    run_client(period, connection, server_address);
     run_server(server_address, period).await?;
 
     Ok(())

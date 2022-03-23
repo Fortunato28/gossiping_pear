@@ -23,7 +23,7 @@ async fn receive_connected_peer_address(
     let connected_peer_listenting_port = incoming
         .next()
         .await
-        .ok_or(anyhow!("Unable to receive connected peer server port"))??
+        .ok_or_else(|| anyhow!("Unable to receive connected peer server port"))??
         .to_string();
 
     Ok(SocketAddr::new(
