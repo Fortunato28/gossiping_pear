@@ -1,4 +1,4 @@
-# Gossiping_pear
+# Gossiping_peer
 
 Test task completed according to [this exercise](https://hackmd.io/@r3XngjBBSumx2rU-hKU7Qg/BkbHS80cv). Despinte on the task, peers will sending not a random messages, but their period arguments for more clarity.
 # TODO
