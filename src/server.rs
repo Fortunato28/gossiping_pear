@@ -2,14 +2,14 @@ use anyhow::{anyhow, Context, Result};
 use parking_lot::Mutex;
 use std::net::SocketAddr;
 
-use crate::{gossiping::gossiping, PeerMap};
+use crate::{gossiping::gossiping, nothing_to_do, PeerMap};
 use futures::{future, pin_mut, StreamExt, TryStreamExt};
 use futures_channel::mpsc::{unbounded, UnboundedSender};
 use itertools::Itertools;
 use tokio::net::{TcpListener, TcpStream};
 use tungstenite::Message;
 
-fn send_other_peers(tx: UnboundedSender<Message>, current_peer_map: String) -> Result<()> {
+fn send_other_peers(tx: &UnboundedSender<Message>, current_peer_map: String) -> Result<()> {
     tx.unbounded_send(Message::Text(current_peer_map))
         .context("Error while trying to share peer map")?;
 
@@ -48,10 +48,9 @@ async fn handle_connection(
     )
     .await
     {
-        Ok(_) => return,
+        Ok(_) => nothing_to_do(),
         Err(error) => {
             println!("Error during connection handling: {}", error);
-            return;
         }
     };
 }
@@ -84,9 +83,9 @@ async fn handle_connection_with_error_propagating(
     let current_peer_map = peer_map
         .lock()
         .iter()
-        .map(|address| address.to_string())
+        .map(std::string::ToString::to_string)
         .join(" ");
-    send_other_peers(tx.clone(), current_peer_map)?;
+    send_other_peers(&tx, current_peer_map)?;
     // Insert the write part of this peer to the peer map.
     peer_map.lock().push(connected_peer_address);
     // Delete disconnected peer no matter what was happened with current connection
@@ -125,7 +124,9 @@ async fn handle_connection_with_error_propagating(
     Ok(())
 }
 
-pub async fn run_server(server_address: SocketAddr, period: u32) -> Result<()> {
+///
+/// # Errors
+pub async fn run(server_address: SocketAddr, period: u32) -> Result<()> {
     let peers_to_connect = PeerMap::new(Mutex::new(Vec::new()));
 
     let try_socket = TcpListener::bind(&server_address).await;

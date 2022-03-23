@@ -9,9 +9,9 @@ use futures_channel::mpsc::{unbounded, UnboundedSender};
 use tokio_tungstenite::connect_async;
 use tungstenite::{Error, Message};
 
-use crate::gossiping::gossiping;
+use crate::{gossiping::gossiping, nothing_to_do};
 
-async fn send_server_port(tx: UnboundedSender<Message>, port: u16) -> Result<()> {
+fn send_server_port(tx: &UnboundedSender<Message>, port: u16) -> Result<()> {
     tx.unbounded_send(Message::Text(port.to_string()))
         .context("Unable to send port")?;
 
@@ -34,7 +34,7 @@ async fn client_behavior_with_error_propagating(
     let data_reseiving = receive_data(incoming, connection, server_address, period);
 
     tokio::spawn(gossiping(tx.clone(), period));
-    send_server_port(tx, server_address.port()).await?;
+    send_server_port(&tx, server_address.port())?;
 
     let sending_process = rx.map(Ok).forward(outgoing);
 
@@ -46,10 +46,9 @@ async fn client_behavior_with_error_propagating(
 
 async fn client_behavior(period: u32, connection: String, server_address: SocketAddr) {
     match client_behavior_with_error_propagating(period, connection, server_address).await {
-        Ok(_) => return,
+        Ok(_) => nothing_to_do(),
         Err(error) => {
             println!("Error during connection handling: {}", error);
-            return;
         }
     };
 }
@@ -83,7 +82,7 @@ fn receive_data(
                 "".to_string()
             }
         };
-        dbg!(&peers_to_connect);
+
         peers_to_connect
             .split_whitespace()
             .into_iter()
@@ -114,8 +113,9 @@ fn receive_data(
     .boxed()
 }
 
-pub fn run_client(period: u32, connection: Vec<String>, server_address: SocketAddr) {
+#[allow(clippy::needless_for_each)]
+pub fn run(period: u32, connection: &[String], server_address: SocketAddr) {
     connection.iter().for_each(|connection| {
         tokio::spawn(client_behavior(period, connection.clone(), server_address));
-    })
+    });
 }

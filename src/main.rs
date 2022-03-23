@@ -11,9 +11,6 @@ use anyhow::Result;
 use clap::Parser;
 use parking_lot::Mutex;
 
-use client::run_client;
-use server::run_server;
-
 // Using parking_lot::Mutex to avoid poisoning which is not matter in this implementation
 type PeerMap = Arc<Mutex<Vec<SocketAddr>>>;
 
@@ -39,8 +36,8 @@ async fn main() -> Result<()> {
     } = Arguments::parse();
 
     let server_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
-    run_client(period, connection, server_address);
-    run_server(server_address, period).await?;
+    client::run(period, &connection, server_address);
+    server::run(server_address, period).await?;
 
     Ok(())
 }
