@@ -38,13 +38,14 @@ async fn client_behavior(period: u32, connection: String, port: u16) {
     future::select(broadcast_incoming, sending_process).await;
 }
 
+// We need exactly this return type to avoid recursion in async function
 fn receive_data(
     mut incoming: futures::stream::SplitStream<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
         >,
     >,
-    connection: String,
+    connected_peer_address: String,
     port: u16,
     period: u32,
 ) -> BoxFuture<'static, Result<(), Error>> {
@@ -61,11 +62,18 @@ fn receive_data(
             });
 
         // TODO probably extract shared incoming behavior with server part
-        let broadcast_incoming = incoming.try_for_each(move |msg| {
+        let broadcast_incoming = incoming.try_for_each(move |message| {
+            let message = match message.to_text() {
+                Ok(message) => message,
+                Err(error) => {
+                    println!("Unable to cast received message to string: {}", error);
+                    return future::ok(());
+                }
+            };
+
             println!(
-                "Received a message from {}: {}",
-                connection,
-                msg.to_text().unwrap()
+                "Received a message from {}: {:?}",
+                connected_peer_address, message,
             );
 
             future::ok(())

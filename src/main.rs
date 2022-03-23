@@ -3,16 +3,18 @@ pub mod gossiping;
 pub mod server;
 
 use std::{
-    io::Error as IoError,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
 };
 
+use anyhow::Result;
 use clap::Parser;
+use parking_lot::Mutex;
 
 use client::run_client;
 use server::run_server;
 
+// Using parking_lot::Mutex to avoid poisoning which is not matter in this implementation
 type PeerMap = Arc<Mutex<Vec<SocketAddr>>>;
 
 fn nothing_to_do() {}
@@ -20,27 +22,25 @@ fn nothing_to_do() {}
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Arguments {
-    // TODO Figure out what means arguments below
-    #[clap(short, long)]
+    #[clap(long)]
     period: u32,
     #[clap(long)]
     port: u16,
-    // TODO make a Vec<Uri>
-    // TODO change name of field
     #[clap(long)]
     connection: Vec<String>,
 }
 
 #[tokio::main]
-async fn main() -> Result<(), IoError> {
+async fn main() -> Result<()> {
     let Arguments {
         period,
         port,
         connection,
     } = Arguments::parse();
 
+    let server_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
     run_client(period, connection, port);
-    run_server(port, period).await;
+    run_server(server_address, period).await?;
 
     Ok(())
 }
